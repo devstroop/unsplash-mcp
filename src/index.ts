@@ -315,10 +315,8 @@ class UnsplashMCPServer {
 }
 
 // Run the server
-if (import.meta.url === `file://${process.argv[1]}`) {
-  const server = new UnsplashMCPServer();
-  server.run().catch((error) => {
-    logError(error);
-    process.exit(1);
-  });
-}
+const server = new UnsplashMCPServer();
+server.run().catch((error) => {
+  logError(error);
+  process.exit(1);
+});

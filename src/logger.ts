@@ -11,6 +11,7 @@ export const logger = winston.createLogger({
   defaultMeta: { service: 'unsplash-mcp' },
   transports: [
     new winston.transports.Console({
+      stderrLevels: ['error', 'warn', 'info', 'debug'],
       format: winston.format.combine(
         winston.format.colorize(),
         winston.format.simple()
