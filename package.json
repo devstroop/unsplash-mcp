@@ -11,7 +11,6 @@
     "test": "jest",
     "test:watch": "jest --watch",
     "test:scraper": "tsx src/test-scraper.ts",
-    "validate": "node success-check.js",
     "lint": "eslint src/**/*.ts",
     "format": "prettier --write src/**/*.ts",
     "clean": "rimraf dist"
@@ -30,9 +29,7 @@
     "cheerio": "^1.0.0-rc.12",
     "axios": "^1.6.0",
     "axios-retry": "^4.0.0",
-    "winston": "^3.11.0",
-    "dotenv": "^16.3.0",
-    "user-agents": "^1.1.0"
+    "winston": "^3.11.0"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
