@@ -4,8 +4,8 @@
     {
       "label": "build",
       "type": "shell",
-      "command": "npm",
-      "args": ["run", "build"],
+      "command": "cargo",
+      "args": ["build", "--release"],
       "group": {
         "kind": "build",
         "isDefault": true
@@ -16,12 +16,12 @@
         "focus": false,
         "panel": "shared"
       },
-      "problemMatcher": ["$tsc"]
+      "problemMatcher": ["$rustc"]
     },
     {
       "label": "test",
       "type": "shell",
-      "command": "npm",
+      "command": "cargo",
       "args": ["test"],
       "group": {
         "kind": "test",
@@ -37,8 +37,8 @@
     {
       "label": "dev",
       "type": "shell",
-      "command": "npm",
-      "args": ["run", "dev"],
+      "command": "cargo",
+      "args": ["run"],
       "group": "build",
       "presentation": {
         "echo": true,
