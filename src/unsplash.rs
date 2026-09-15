@@ -26,6 +26,18 @@ fn as_results(value: Value) -> Value {
     }
 }
 
+/// Truncate a results array to the requested page size. napi sometimes ignores
+/// `per_page`, so enforce the tool contract here.
+fn limit_array(value: Value, n: u32) -> Value {
+    match value {
+        Value::Array(mut items) => {
+            items.truncate(n as usize);
+            Value::Array(items)
+        }
+        other => other,
+    }
+}
+
 /// Unsplash image source: persistent headless Chrome (chromiumoxide) solves
 /// the Anubis bot-check once, then every tool reads Unsplash's internal
 /// `/napi/*` JSON endpoints inside the cleared page context. No API key.
@@ -59,7 +71,7 @@ impl Unsplash {
             path.push_str(&format!("&color={}", enc(c)));
         }
         let v = self.browser.fetch_napi(&path).await?;
-        Ok(as_results(v))
+        Ok(limit_array(as_results(v), per_page))
     }
 
     pub async fn popular_images(&self, page: u32, per_page: u32, order_by: &str) -> Result<Value> {
@@ -70,7 +82,7 @@ impl Unsplash {
             enc(order_by)
         );
         let v = self.browser.fetch_napi(&path).await?;
-        Ok(as_results(v))
+        Ok(limit_array(as_results(v), per_page))
     }
 
     pub async fn browse_category(&self, category: &str, page: u32, per_page: u32) -> Result<Value> {
@@ -82,7 +94,7 @@ impl Unsplash {
             per_page.min(30)
         );
         let v = self.browser.fetch_napi(&path).await?;
-        Ok(as_results(v))
+        Ok(limit_array(as_results(v), per_page))
     }
 
     pub async fn user_profile(&self, username: &str, include_photos: bool) -> Result<Value> {
@@ -96,7 +108,7 @@ impl Unsplash {
             match self.browser.fetch_napi(&photos_path).await {
                 Ok(photos) => {
                     if let Some(obj) = profile.as_object_mut() {
-                        obj.insert("recent_photos".to_string(), as_results(photos));
+                        obj.insert("recent_photos".to_string(), limit_array(as_results(photos), 12));
                     }
                 }
                 Err(e) => {
@@ -126,7 +138,7 @@ impl Unsplash {
             enc(color)
         );
         let v = self.browser.fetch_napi(&path).await?;
-        Ok(as_results(v))
+        Ok(limit_array(as_results(v), per_page))
     }
 
     pub async fn collections(&self, page: u32, per_page: u32, featured: bool) -> Result<Value> {
@@ -135,7 +147,7 @@ impl Unsplash {
             path.push_str("&featured=true");
         }
         let v = self.browser.fetch_napi(&path).await?;
-        Ok(as_results(v))
+        Ok(limit_array(as_results(v), per_page))
     }
 
     pub async fn collection_photos(
@@ -151,7 +163,7 @@ impl Unsplash {
             per_page.min(30)
         );
         let v = self.browser.fetch_napi(&path).await?;
-        Ok(as_results(v))
+        Ok(limit_array(as_results(v), per_page))
     }
 
     pub async fn random_photos(
@@ -177,17 +189,57 @@ impl Unsplash {
 
 #[cfg(test)]
 mod tests {
-    use super::{enc, topic_slug};
+    use super::{as_results, enc, limit_array, topic_slug};
+    use serde_json::{json, Value};
 
     #[test]
     fn encodes_query_values() {
         assert_eq!(enc("mountain landscape"), "mountain%20landscape");
         assert_eq!(enc("black & white"), "black%20%26%20white");
+        assert_eq!(enc(""), "");
+        assert_eq!(enc("a+b"), "a%2Bb");
+        assert_eq!(enc("café"), "caf%C3%A9");
     }
 
     #[test]
     fn slugifies_categories() {
         assert_eq!(topic_slug("Nature"), "nature");
         assert_eq!(topic_slug("Black & White"), "black-%26-white");
+        assert_eq!(topic_slug("  Architecture  "), "architecture");
+        // Single-space replacement (documents current behavior for odd input).
+        assert_eq!(topic_slug("street  photography"), "street--photography");
+    }
+
+    #[test]
+    fn unwraps_search_response_shape() {
+        // napi search endpoints wrap hits in { results, total, ... }.
+        let wrapped: Value = json!({"results": [{"id": "a"}], "total": 100});
+        assert_eq!(as_results(wrapped), json!([{"id": "a"}]));
+    }
+
+    #[test]
+    fn passes_through_list_response_shape() {
+        // Photo-list endpoints return a bare array; single-object endpoints
+        // (profile, photo details) return a bare object. Both pass through.
+        let arr: Value = json!([{"id": "a"}]);
+        assert_eq!(as_results(arr.clone()), arr);
+        let obj: Value = json!({"id": "x", "username": "y"});
+        assert_eq!(as_results(obj.clone()), obj);
+    }
+
+    #[test]
+    fn truncates_result_arrays() {
+        let v: Value = json!([1, 2, 3, 4, 5]);
+        assert_eq!(limit_array(v, 3).as_array().unwrap().len(), 3);
+        let obj: Value = json!({"id": "x"});
+        assert_eq!(limit_array(obj.clone(), 3), obj);
+    }
+
+    #[test]
+    fn truncate_handles_edges() {
+        assert_eq!(limit_array(json!([]), 5), json!([]));
+        assert_eq!(limit_array(json!([1, 2]), 0), json!([]));
+        // Limit above length keeps everything.
+        assert_eq!(limit_array(json!([1, 2]), 30), json!([1, 2]));
     }
 }

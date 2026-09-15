@@ -339,3 +339,61 @@ async fn main() -> anyhow::Result<()> {
     service.waiting().await?;
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn search_args_apply_defaults() {
+        let args: SearchImagesArgs = serde_json::from_value(json!({"query": "nature"})).unwrap();
+        assert_eq!(args.query, "nature");
+        assert_eq!(args.page, 1);
+        assert_eq!(args.per_page, 20);
+        assert_eq!(args.orientation, None);
+        assert_eq!(args.color, None);
+    }
+
+    #[test]
+    fn search_args_reject_missing_query() {
+        let err = serde_json::from_value::<SearchImagesArgs>(json!({"page": 2})).unwrap_err();
+        assert!(err.to_string().contains("query"), "unexpected error: {err}");
+    }
+
+    #[test]
+    fn popular_args_default_order() {
+        let args: PopularImagesArgs = serde_json::from_value(json!({})).unwrap();
+        assert_eq!(args.page, 1);
+        assert_eq!(args.per_page, 20);
+        assert_eq!(args.order_by, "popular");
+    }
+
+    #[test]
+    fn user_profile_includes_photos_by_default() {
+        let args: UserProfileArgs =
+            serde_json::from_value(json!({"username": "someone"})).unwrap();
+        assert!(args.include_photos);
+    }
+
+    #[test]
+    fn random_args_default_count() {
+        let args: RandomPhotosArgs = serde_json::from_value(json!({})).unwrap();
+        assert_eq!(args.count, 10);
+        assert_eq!(args.query, None);
+    }
+
+    #[test]
+    fn collections_args_default_flags() {
+        let args: CollectionsArgs = serde_json::from_value(json!({})).unwrap();
+        assert!(!args.featured);
+        assert_eq!(args.per_page, 20);
+    }
+
+    #[test]
+    fn category_requires_name() {
+        let err =
+            serde_json::from_value::<BrowseCategoryArgs>(json!({"page": 1})).unwrap_err();
+        assert!(err.to_string().contains("category"), "unexpected error: {err}");
+    }
+}

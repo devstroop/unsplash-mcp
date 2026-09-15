@@ -497,3 +497,44 @@ const DEFAULT_CHROME_ARGS: &[&str] = &[
 
 /// Shared handle type used by the MCP tools.
 pub type SharedBrowser = Arc<BrowserManager>;
+
+#[cfg(test)]
+mod live_tests {
+    use super::*;
+
+    /// End-to-end clearance test: launches real Chrome, passes Anubis, reads napi.
+    /// Needs Chrome + network + an unflagged egress IP, so it is opt-in:
+    /// `UNSPLASH_LIVE_TEST=1 cargo test`. Plain `cargo test` skips it.
+    #[tokio::test]
+    async fn live_clearance_and_search() {
+        if std::env::var("UNSPLASH_LIVE_TEST").ok().as_deref() != Some("1") {
+            eprintln!("skipping live browser test (set UNSPLASH_LIVE_TEST=1 to run)");
+            return;
+        }
+        let mgr = BrowserManager::new();
+        let page = mgr
+            .cleared_page("https://unsplash.com/")
+            .await
+            .expect("bot-check clearance");
+        let title: String = page
+            .evaluate("document.title")
+            .await
+            .expect("title eval")
+            .into_value()
+            .expect("title string");
+        assert!(
+            !title.to_lowercase().contains("not a bot") && title != "Oh noes!",
+            "still on bot page: {title}"
+        );
+        let _ = page.close().await;
+
+        let v = mgr
+            .fetch_napi("/napi/search/photos?query=nature&page=1&per_page=2")
+            .await
+            .expect("napi fetch");
+        let results = v.get("results").cloned().unwrap_or(v);
+        let items = results.as_array().expect("results array");
+        assert!(!items.is_empty(), "empty search results");
+        assert!(items[0].get("id").is_some(), "result missing id: {}", items[0]);
+    }
+}

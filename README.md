@@ -74,7 +74,8 @@ Logs always go to **stderr** — stdout is reserved for MCP JSON-RPC.
 
 ```bash
 cargo build          # debug build
-cargo test           # unit tests (URL encoding, slug mapping)
+cargo test           # fast offline unit tests (encoding, slugs, response shapes, arg defaults)
+UNSPLASH_LIVE_TEST=1 cargo test   # also runs the live Chrome clearance + napi test
 cargo build --release
 ```
 
